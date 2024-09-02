@@ -1,0 +1,8 @@
+mesop
+langchain
+langchain-google-vertexai
+langchain-google-community[featurestore]
+langfuse
+google-cloud-bigquery
+
+
