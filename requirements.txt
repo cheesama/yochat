@@ -1,8 +1,9 @@
 mesop
 langchain
 langchain-google-vertexai
-langchain-google-community[featurestore]
+langchain-bedrock
+langchain-community
 langfuse
-google-cloud-bigquery
-
-
+pymilvus[model]
+duckdb
+taskgen-ai
