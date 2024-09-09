@@ -1,19 +1,30 @@
+import re
 import logging
-from langchain_core.prompts import PromptTemplate
-from langchain.agents import AgentExecutor
-from langchain.tools import Tool
-from langchain_community.llms import OpenAI
-from langchain_community.llms import Bedrock
-from langchain_google_vertexai import VertexAI
+import dotenv
 
-from conversable_prompt import (
+dotenv.load_dotenv()
+
+from pydantic import Field
+from llama_index.core.agent import FunctionCallingAgentWorker, ReActAgent
+from llama_index.core.tools import FunctionTool
+from llama_index.core.query_pipeline import QueryPipeline
+from llama_index.llms.cohere import Cohere
+from llama_agents import (
+    AgentService,
+    AgentOrchestrator,
+    ControlPlaneServer,
+    SimpleMessageQueue,
+    ServerLauncher,
+    CallableMessageConsumer,
+)
+
+from meta_agent.conversable_prompt import (
     get_task_complexity_prompt,
     get_conversable_prompt,
     get_subtask_prompt,
     get_execution_plan_prompt,
 )
 
-import re
 
 # 로거 설정
 logging.basicConfig(
@@ -22,25 +33,32 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def get_llm(llm_type="gemini"):
-    if llm_type == "openai":
-        return OpenAI()
-    elif llm_type == "bedrock":
-        return Bedrock()
-    else:
-        return VertexAI(model_name="gemini-1.5-flash")
+def get_llm(llm_type="cohere"):
+    # if llm_type == "openai":
+    #     return OpenAI()
+    # elif llm_type == "bedrock":
+    #     return Bedrock()
+    return Cohere(model_name="command-r")
 
 
 class ConversableAgent:
-    def __init__(self, llm_type="gemini", tools=None):
+    def __init__(self, llm_type="cohere", tools=None):
         self.llm = get_llm(llm_type)
-        self.tools = tools if tools is not None else []
+
+        # create our multi-agent framework components
+        message_queue = SimpleMessageQueue()
+        control_plane = ControlPlaneServer(
+            message_queue=message_queue,
+            orchestrator=AgentOrchestrator(llm=self.llm),
+        )
+
         self.system_prompt = "You are an expert assistant capable of engaging in a conversation to solve complex tasks."
         logger.info(
             f"ConversableAgent 초기화 완료 (LLM 타입: {llm_type}, 모델: {self.llm.model_name})"
         )
 
-    def add_tool(self, tool: Tool):
+    def add_tool(self, fn):
+        tool = FunctionTool.from_defaults(fn=fn)
         self.tools.append(tool)
 
     def remove_tool(self, tool_name: str):
@@ -121,25 +139,29 @@ class ConversableAgent:
         return final_result
 
 
-# 시스템에서 초기 로딩 시 에이전트 설정 및 기본 툴 추가 예시
-def initialize_conversable_agent_system(llm_type="gemini"):
-    agent = ConversableAgent(llm_type=llm_type)
+def task_decomposition(task_description: str = Field(description="태스크 설명")) -> str:
+    """태스크를 서브태스크들로 분해"""
 
-    task_decomposition_tool = Tool(
+    return Tool(
         name="TaskDecompositionAndExecution",
         func=lambda task_description: agent.execute_task(task_description),
         description="Decompose tasks into sub-tasks and execute them",
     )
-    agent.add_tool(task_decomposition_tool)
+
+
+# 시스템에서 초기 로딩 시 에이전트 설정 및 기본 툴 추가
+def initialize_conversable_agent_system(llm_type="cohere"):
+    agent = ConversableAgent(llm_type=llm_type)
+
+    # add default tools
+    agent.add_tool(task_decomposition)
 
     return agent
 
 
 # 시스템에서 에이전트 실행 예시
 def main():
-    llm_type = "gemini"
-
-    agent_system = initialize_conversable_agent_system(llm_type)
+    agent_system = initialize_conversable_agent_system()
 
     task_description = "영수가 5개 중에 3개의 사과를 먹었어, 영희한테 모든 사과를 준다고 할 때 몇개를 받아?"
 
