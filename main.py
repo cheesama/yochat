@@ -3,7 +3,8 @@ import time
 
 import mesop as me
 import mesop.labs as mel
-from meta_agent.agent import ConversableAgent
+
+from meta_agent.agent.main_agent import MainAgent
 
 from pages.apis.api_list import api_list_page
 from pages.custom_models.custom_model_list import custom_model_list_page
@@ -41,10 +42,10 @@ def chat_page():
 
 def transform(input: str, history: list[mel.ChatMessage]):
     state = me.state(State)
-    agent = ConversableAgent()
+    agent = MainAgent(timeout=60, verbose=True)
 
     # 에이전트에 쿼리 전송 및 응답 생성
-    response = agent.execute_task(input)
+    response = agent.run(query=input)
 
     # 응답 반환
     yield response

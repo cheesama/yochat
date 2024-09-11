@@ -5,12 +5,14 @@ pydantic
 langchain
 langchain-bedrock
 langchain-community
-langfuse
+
 
 pymilvus[model]
 duckdb
 
 llama-index
 llama-agents
+llama-index-utils-workflow
 llama-index-llms-cohere
 cohere
+traceloop-sdk
